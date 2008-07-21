@@ -109,17 +109,16 @@ module RubyInstaller
           '7za458.zip'
         ]
     )
-    
+
     OpenSsl = OpenStruct.new(
-      :url => "http://easynews.dl.sourceforge.net/gnuwin32",
-      :version => '0.9.7.c',
-      :target => RubyInstaller::MinGW.target,
-      :files => [
-        'openssl-0.9.7c-bin.zip',
-        'openssl-0.9.7c-lib.zip'
+      :url => "http://www.openssl.org/source",
+      :version => '0.9.8.h',
+      :target => 'sandbox/openssl',
+      :files => [ 
+        'openssl-0.9.8h.tar.gz' 
       ]
     )
-    
+
     Iconv = OpenStruct.new(
       :release => 'official',
       :version => "1.9.2-1",
