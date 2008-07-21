@@ -6,7 +6,17 @@ namespace(:dependencies) do
     package = RubyInstaller::OpenSsl
     directory package.target
     CLEAN.include(package.target)
-    
+
+    # reference to specific files inside OpenSSL
+    readme = File.join(package.target, 'README')
+    configure = File.join(package.target, 'Configure')
+    makefile = File.join(package.target, 'Makefile')
+    minfo = File.join(package.target, 'MINFO')
+    makefile_mingw = File.join(package.target, 'ms', 'mingw32a.mak')
+    makefile_msys = File.join(package.target, 'ms', 'mingw32a-msys.mak')
+    def_libeay = File.join(package.target, 'ms', 'libeay32.def')
+    def_ssleay = File.join(package.target, 'ms', 'ssleay32.def')
+
     # Put files for the :download task
     package.files.each do |f|
       file_source = "#{package.url}/#{f}"
