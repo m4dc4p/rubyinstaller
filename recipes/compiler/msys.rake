@@ -59,7 +59,11 @@ namespace(:compiler) do
       end
       File.open(profile, 'w') { |f| f.write(contents) }
     end
-    
+
+    task :shell do
+      system "\"#{File.join(RubyInstaller::ROOT, RubyInstaller::MSYS.target, "bin")}/bash.exe\" --login -i"
+    end
+
     def msys_sh(*args)
       cmd = args.join(' ')
       sh "\"#{File.join(RubyInstaller::ROOT, RubyInstaller::MSYS.target, "bin")}/bash.exe\" --login -i -c \"#{cmd}\""
@@ -76,3 +80,4 @@ end
 task :download  => ['compiler:msys:download']
 task :extract   => ['compiler:msys:extract']
 task :prepare   => ['compiler:msys:prepare']
+task :shell     => ['compiler:msys:shell']

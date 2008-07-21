@@ -25,6 +25,9 @@ task :check
 desc "Test drive the sandbox (using IRB)."
 task :irb
 
+desc 'Test drive MinGW+MSYS installation (using Bash)'
+task :shell
+
 desc "Do everything!"
 task :default => [:download, :extract, :prepare, :configure, :compile, :install]
 
