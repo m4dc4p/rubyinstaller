@@ -114,8 +114,8 @@ module RubyInstaller
       :url => "http://www.openssl.org/source",
       :version => '0.9.8.h',
       :target => 'sandbox/openssl',
-      :files => [ 
-        'openssl-0.9.8h.tar.gz' 
+      :files => [
+        'openssl-0.9.8h.tar.gz'
       ]
     )
 
