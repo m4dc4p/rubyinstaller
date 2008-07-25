@@ -14,8 +14,10 @@ namespace(:dependencies) do
     minfo = File.join(package.target, 'MINFO')
     makefile_mingw = File.join(package.target, 'ms', 'mingw32a.mak')
     makefile_msys = File.join(package.target, 'ms', 'mingw32a-msys.mak')
-    def_libeay = File.join(package.target, 'ms', 'libeay32.def')
-    def_ssleay = File.join(package.target, 'ms', 'ssleay32.def')
+    x509 = File.join(package.target, 'include', 'openssl', 'x509.h')
+    x509_vfy = File.join(package.target, 'include', 'openssl', 'x509_vfy.h')
+    tmp_x509 = File.join(package.target, 'outinc', 'openssl', 'x509.h')
+    tmp_x509_vfy = File.join(package.target, 'outinc', 'openssl', 'x509_vfy.h')
 
     # Put files for the :download task
     package.files.each do |f|
@@ -37,18 +39,24 @@ namespace(:dependencies) do
       files.each { |f|
         extract(File.join(RubyInstaller::ROOT, f), package.target)
       }
+
+      # remove bundled Makefile
+      cd package.target do
+        # rm_f 'Makefile'
+      end
     end
     task :extract => [readme]
 
-    file configure => [:extract]
-    file makefile => configure do
-      cd package.target do
-        msys_sh 'Configure mingw'
-      end
+    # fix a missing header copy
+    file tmp_x509 => x509 do |f|
+      cp x509, tmp_x509
     end
-    task :configure => [makefile]
 
-    task :prepare => [:configure] do
+    file tmp_x509_vfy => x509_vfy do |f|
+      cp x509_vfy, tmp_x509_vfy
+    end
+
+    task :prepare => [:extract, tmp_x509, tmp_x509_vfy] do
       package_root = File.join(RubyInstaller::ROOT, package.target)
       include_dir = File.join(package_root, 'include', 'openssl')
       test_dir = File.join(package_root, 'test')
@@ -72,17 +80,23 @@ namespace(:dependencies) do
           end
         end
       end
+
+      cd package.target do
+        Dir.glob("*.h") do |header|
+          cp header, include_dir
+        end
+      end
     end
 
-    file minfo => [:extract] do
+    file minfo => [:prepare] do
       cd package.target do
-        msys_sh "perl util/mkfiles.pl > MINFO"
+        msys_sh "make files"
       end
     end
 
     file makefile_mingw => [minfo] do
       cd package.target do
-        msys_sh "perl util/mk1mf.pl gaswin Mingw32 > ms/mingw32a.mak"
+        msys_sh "perl util/mk1mf.pl no-asm dll shared Mingw32 > ms/mingw32a.mak"
       end
     end
 
@@ -100,61 +114,19 @@ namespace(:dependencies) do
       end
     end
 
-    file def_libeay do
-      cd package.target do
-        msys_sh "perl util/mkdef.pl 32 libeay > ms/libeay32.def"
-      end
-    end
-    
-    file def_ssleay do
-      cd package.target do
-        msys_sh "perl util/mkdef.pl 32 ssleay > ms/ssleay32.def"
-      end
-    end
-
-    assembler_files = {
-      'crypto/bn/asm/bn-win32.s' => 'bn-586.pl',
-      'crypto/bn/asm/co-win32.s' => 'co-586.pl',
-      'crypto/des/asm/d-win32.s' => 'des-586.pl',
-      'crypto/des/asm/y-win32.s' => 'crypt586.pl',
-      'crypto/bf/asm/b-win32.s' => 'bf-586.pl',
-      'crypto/bn/asm/bn-win32.s' => 'bn-586.pl',
-      'crypto/cast/asm/c-win32.s' => 'cast-586.pl',
-      'crypto/rc4/asm/r4-win32.s' => 'rc4-586.pl',
-      'crypto/md5/asm/m5-win32.s' => 'md5-586.pl',
-      'crypto/sha/asm/s1-win32.s' => 'sha1-586.pl',
-      'crypto/ripemd/asm/rm-win32.s' => 'rmd-586.pl',
-      'crypto/rc5/asm/r5-win32.s' => 'rc5-586.pl',
-      'crypto/bn/asm/bn-win32.s' => 'bn-586.pl',
-      'crypto/cpu-win32.s' => 'x86cpuid.pl'
-    }
-
-    assembler_files.each do |asm, script|
-      file File.join(package.target, asm) => File.join(package.target, File.dirname(asm), script) do
-        cd File.join(package.target, File.dirname(asm)) do
-          msys_sh "perl #{script} gaswin > #{File.basename(asm)}"
-        end
-      end
-      task :assemble => File.join(package.target, asm)
-    end
-
-    task :compile => [makefile_msys, def_libeay, def_ssleay, :assemble] do
+    task :compile => [makefile_msys] do
       cd package.target do
         msys_sh "make -f ms/mingw32a-msys.mak"
       end
     end
 
-=begin
-    # Prepare the :sandbox, it requires the :download task
-    task :extract => [:extract_utils, :download, package.target] do
-      # grab the files from the download task
-      files = Rake::Task['dependencies:openssl:download'].prerequisites
-
-      files.each { |f|
-        extract(File.join(RubyInstaller::ROOT, f), package.target)
-      }
+    task :check => [:compile] do
+      cd package.target do
+        Dir.glob('out/*.exe').each do |test_app|
+          sh test_app
+        end
+      end
     end
-=end
   end
 end
 
