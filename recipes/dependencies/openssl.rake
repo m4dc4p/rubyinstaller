@@ -20,16 +20,16 @@ namespace(:dependencies) do
     libcrypto = File.join(package.target, 'out', 'libcrypto.a')
     libssl = File.join(package.target, 'out', 'libssl.a')
 
-    libeay32 = File.join(package.target, 'out', 'libeay32.a')
-    ssleay32 = File.join(package.target, 'out', 'ssleay32.a')
+    libeay32 = File.join(package.target, 'out', 'libcrypto.dll.a')
+    ssleay32 = File.join(package.target, 'out', 'libssl.dll.a')
     libeay32_def = File.join(package.target, 'ms', 'libeay32.def')
     ssleay32_def = File.join(package.target, 'ms', 'ssleay32.def')
     libeay32_dll = File.join(package.target, 'out', 'libeay32.dll')
     ssleay32_dll = File.join(package.target, 'out', 'ssleay32.dll')
     include_dir = File.join(package.target, 'outinc', 'openssl')
 
-    installed_libeay32 = File.join(mingw.target, 'lib', 'libeay32.a')
-    installed_ssleay32 = File.join(mingw.target, 'lib', 'ssleay32.a')
+    installed_libeay32 = File.join(mingw.target, 'lib', 'libcrypto.a')
+    installed_ssleay32 = File.join(mingw.target, 'lib', 'libssl.a')
     installed_libeay32_dll = File.join(mingw.target, 'bin', 'libeay32.dll')
     installed_ssleay32_dll = File.join(mingw.target, 'bin', 'ssleay32.dll')
     installed_include_dir = File.join(mingw.target, 'include', 'openssl')
@@ -87,7 +87,7 @@ namespace(:dependencies) do
 
     file configure => [readme] do
       contents = File.read(configure)
-      contents.gsub!(":-mno-cygwin -Wl,--export-all -shared:.dll.a", ":-mno-cygwin -Wl,--export-all -shared:.dll.a")
+      contents.gsub!(":-mno-cygwin -shared:.dll.a", ":-mno-cygwin -Wl,--export-all -shared:.dll.a")
       File.open(configure, 'w') do |f|
         f.write contents
       end
@@ -195,15 +195,17 @@ namespace(:dependencies) do
       end
     end
 
+    file ssleay32 => [ssleay32_dll]
     file ssleay32_dll => [ssleay32_def, libeay32_dll] do
       cd package.target do
-        msys_sh "dllwrap --dllname out/ssleay32.dll --output-lib out/ssleay32.a --def ms/ssleay32.def out/libssl.a out/libeay32.a"
+        msys_sh "dllwrap --dllname out/ssleay32.dll --output-lib out/libssl.dll.a --def ms/ssleay32.def out/libssl.a out/libcrypto.dll.a"
       end
     end
 
+    file libeay32 => [libeay32_dll]
     file libeay32_dll => [libeay32_def] do
       cd package.target do
-        msys_sh "dllwrap --dllname out/libeay32.dll --output-lib out/libeay32.a --def ms/libeay32.def out/libcrypto.a -lwsock32 -lgdi32"
+        msys_sh "dllwrap --dllname out/libeay32.dll --output-lib out/libcrypto.dll.a --def ms/libeay32.def out/libcrypto.a -lwsock32 -lgdi32"
       end
     end
     task :compile => [libeay32_dll, ssleay32_dll]
