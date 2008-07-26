@@ -67,19 +67,33 @@ namespace(:compiler) do
     end
 
     task :shell do
-      system "\"#{File.join(RubyInstaller::ROOT, RubyInstaller::MSYS.target, "bin")}/bash.exe\" --login -i"
+      ensure_term
+      system bash
     end
 
     def msys_sh(*args)
-      cmd = args.join(' ')
-      sh "\"#{File.join(RubyInstaller::ROOT, RubyInstaller::MSYS.target, "bin")}/bash.exe\" --login -i -c \"#{cmd}\""
+      ensure_term
+      sh bash_cmd(args)
     end
     
     def msys_system(*args)
-      cmd = args.join(' ')
-      system "\"#{File.join(RubyInstaller::ROOT, RubyInstaller::MSYS.target, "bin")}/bash.exe\" --login -i -c \"#{cmd}\""
+      ensure_term
+      system bash_cmd(args)
     end
-    
+
+    private
+    def ensure_term
+      ENV['TERM'] = 'msys' unless ENV.include?('TERM')
+    end
+
+    def bash
+      "\"#{File.join(RubyInstaller::ROOT, RubyInstaller::MSYS.target, "bin")}/bash.exe\" --login -i"
+    end
+
+    def bash_cmd(*args)
+      cmd = args.join(' ')
+      "#{bash} -c \"#{cmd}\""
+    end
   end
 end
 
