@@ -54,14 +54,8 @@ namespace(:compiler) do
       #remove the chdir to $HOME in the /etc/profile
       profile = File.join(package.target, "etc", "profile")
       
-      contents = File.read(profile).gsub(/$cd \"\$HOME\"/) do |match|
+      contents = File.read(profile).gsub(/^cd \"\$HOME\"/) do |match|
         "# commented to allow calling from current directory\n##{match}"
-      end
-      unless contents =~ /\$TERM/
-         contents << "\nif [ -z \"$TERM\" ]; then\n"
-         contents << "  TERM=MSYS\n"
-         contents << "fi\n"
-         contents << "export TERM\n"
       end
       File.open(profile, 'w') { |f| f.write(contents) }
     end
