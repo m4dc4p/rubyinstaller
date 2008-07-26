@@ -16,10 +16,46 @@ namespace(:dependencies) do
     makefile = File.join(package.target, 'Makefile')
     makefile_mingw = File.join(package.target, 'ms', 'mingw32a.mak')
     makefile_msys = File.join(package.target, 'ms', 'mingw32a-msys.mak')
+
     libcrypto = File.join(package.target, 'out', 'libcrypto.a')
     libssl = File.join(package.target, 'out', 'libssl.a')
-    installed_libcrypto = File.join(mingw.target, 'lib', 'libcrypto.a')
-    installed_libssl = File.join(mingw.target, 'lib', 'libssl.a')
+
+    libeay32 = File.join(package.target, 'out', 'libeay32.a')
+    ssleay32 = File.join(package.target, 'out', 'ssleay32.a')
+    libeay32_def = File.join(package.target, 'ms', 'libeay32.def')
+    ssleay32_def = File.join(package.target, 'ms', 'ssleay32.def')
+    libeay32_dll = File.join(package.target, 'out', 'libeay32.dll')
+    ssleay32_dll = File.join(package.target, 'out', 'ssleay32.dll')
+    include_dir = File.join(package.target, 'outinc', 'openssl')
+
+    installed_libeay32 = File.join(mingw.target, 'lib', 'libeay32.a')
+    installed_ssleay32 = File.join(mingw.target, 'lib', 'ssleay32.a')
+    installed_libeay32_dll = File.join(mingw.target, 'bin', 'libeay32.dll')
+    installed_ssleay32_dll = File.join(mingw.target, 'bin', 'ssleay32.dll')
+    installed_include_dir = File.join(mingw.target, 'include', 'openssl')
+
+    install_files = {
+      libeay32 => installed_libeay32,
+      ssleay32 => installed_ssleay32,
+      libeay32_dll => installed_libeay32_dll,
+      ssleay32_dll => installed_ssleay32_dll,
+      include_dir => installed_include_dir
+    }
+
+    asm_files = {
+      'crypto/bn/asm/bn-win32.s' => 'bn-586.pl',
+      'crypto/bn/asm/co-win32.s' => 'co-586.pl',
+      'crypto/des/asm/d-win32.s' => 'des-586.pl',
+      'crypto/des/asm/y-win32.s' => 'crypt586.pl',
+      'crypto/bf/asm/b-win32.s' => 'bf-586.pl',
+      'crypto/cast/asm/c-win32.s' => 'cast-586.pl',
+      'crypto/rc4/asm/r4-win32.s' => 'rc4-586.pl',
+      'crypto/md5/asm/m5-win32.s' => 'md5-586.pl',
+      'crypto/sha/asm/s1-win32.s' => 'sha1-586.pl',
+      'crypto/ripemd/asm/rm-win32.s' => 'rmd-586.pl',
+      'crypto/rc5/asm/r5-win32.s' => 'rc5-586.pl',
+      'crypto/cpu-win32.s' => 'x86cpuid.pl'
+    }
 
     # Put files for the :download task
     package.files.each do |f|
@@ -49,7 +85,7 @@ namespace(:dependencies) do
     end
     task :extract => [readme]
 
-    file configure => [:extract] do
+    file configure => [readme] do
       contents = File.read(configure)
       contents.gsub!(":-mno-cygwin -Wl,--export-all -shared:.dll.a", ":-mno-cygwin -Wl,--export-all -shared:.dll.a")
       File.open(configure, 'w') do |f|
@@ -59,7 +95,7 @@ namespace(:dependencies) do
 
     file makefile => [configure] do
       cd package.target do
-        msys_sh "perl Configure mingw shared no-asm"
+        msys_sh "perl Configure mingw shared no-symlinks"
       end
     end
     task :configure => [makefile]
@@ -96,7 +132,23 @@ namespace(:dependencies) do
       end
     end
 
-    file openssl_conf_h => [:prepare]
+    # build the assembly files
+    task :assemble => [:prepare]
+    asm_files.each do |relative_asm, script|
+      path = File.join(package.target, File.dirname(relative_asm))
+      asm = File.basename(relative_asm)
+      asm_with_path = File.join(path, asm)
+      script_with_path = File.join(path, script)
+
+      file asm_with_path => [script_with_path] do
+        cd path do
+          msys_sh "perl #{script} gaswin > #{asm}"
+        end
+      end
+      task :assemble => [asm_with_path]
+    end
+
+    file openssl_conf_h => ['dependencies:openssl:assemble']
     file minfo => [openssl_conf_h] do
       cd package.target do
         msys_sh "perl util/mkfiles.pl > MINFO"
@@ -105,7 +157,7 @@ namespace(:dependencies) do
 
     file makefile_mingw => [minfo] do
       cd package.target do
-        msys_sh "perl util/mk1mf.pl shlib no-asm Mingw32 > ms/mingw32a.mak"
+        msys_sh "perl util/mk1mf.pl shlib gaswin Mingw32 > ms/mingw32a.mak"
       end
     end
 
@@ -130,7 +182,31 @@ namespace(:dependencies) do
         msys_sh "make -f ms/mingw32a-msys.mak"
       end
     end
-    task :compile => [libcrypto]
+
+    file ssleay32_def => [libssl] do
+      cd package.target do
+        msys_sh "perl util/mkdef.pl 32 ssleay > ms/ssleay32.def"
+      end
+    end
+
+    file libeay32_def => [libcrypto] do
+      cd package.target do
+        msys_sh "perl util/mkdef.pl 32 libeay > ms/libeay32.def"
+      end
+    end
+
+    file ssleay32_dll => [ssleay32_def, libeay32_dll] do
+      cd package.target do
+        msys_sh "dllwrap --dllname out/ssleay32.dll --output-lib out/ssleay32.a --def ms/ssleay32.def out/libssl.a out/libeay32.a"
+      end
+    end
+
+    file libeay32_dll => [libeay32_def] do
+      cd package.target do
+        msys_sh "dllwrap --dllname out/libeay32.dll --output-lib out/libeay32.a --def ms/libeay32.def out/libcrypto.a -lwsock32 -lgdi32"
+      end
+    end
+    task :compile => [libeay32_dll, ssleay32_dll]
 
     task :check => [:compile] do
       test_dir = File.join(package.target, 'out')
@@ -147,18 +223,15 @@ namespace(:dependencies) do
       end
     end
 
-    file installed_libssl => [installed_libcrypto]
-    file installed_libcrypto => [libcrypto] do
-      include_dir = File.join(package.target, 'outinc', 'openssl')
-      target_include_dir = File.join(mingw.target, 'include')
-
-      cp libcrypto, installed_libcrypto
-      cp libssl, installed_libssl
-      cp_r include_dir, target_include_dir
+    task :install => [:compile]
+    install_files.each do |source, target|
+      file target => [source] do
+        cp_r source, target
+      end
+      task :install => [target]
     end
-    task :install => [installed_libcrypto]
 
-    task :all => [:download, :extract, :configure, :prepare, :compile, :install]
+    task :all => [:download, :extract, :configure, :prepare, :assemble, :compile, :install]
   end
 end
 
