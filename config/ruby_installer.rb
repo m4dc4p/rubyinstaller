@@ -29,7 +29,7 @@ module RubyInstaller
         'gdb-6.8-mingw-3.tar.bz2'
       ]
     )
-    
+
     MSYS = OpenStruct.new(
       :release => 'technology-preview',
       :version => '1.0.11',
@@ -52,7 +52,7 @@ module RubyInstaller
         'msys-libtool-1.5.tar.bz2'
       ]
     )
-    
+
     Ruby18 = OpenStruct.new(
       :release => "preview1",
       :version => "1.8.6-p114",
@@ -73,12 +73,10 @@ module RubyInstaller
       :dependencies => [
         'readline5.dll',
         'zlib1.dll',
-        'libeay32.dll',
-        'libssl32.dll',
         'libiconv2.dll'
       ]
     )
-    
+
     Zlib = OpenStruct.new(
       :release => "official",
       :version => "1.2.3",
@@ -111,8 +109,8 @@ module RubyInstaller
     )
 
     OpenSsl = OpenStruct.new(
+      :version => '0.9.8h',
       :url => "http://www.openssl.org/source",
-      :version => '0.9.8.h',
       :target => 'sandbox/openssl',
       :files => [
         'openssl-0.9.8h.tar.gz'

@@ -73,7 +73,7 @@ namespace(:interpreter) do
       end
     end
 
-    task :compile do
+    task :compile => [:openssl] do
       Dir.chdir(package.build_target) do
         msys_sh "make"
       end
