@@ -4,20 +4,21 @@ require 'rake/clean'
 namespace(:dependencies) do
   namespace(:openssl) do
     package = RubyInstaller::OpenSsl
+    mingw = RubyInstaller::MinGW
     directory package.target
     CLEAN.include(package.target)
 
     # reference to specific files inside OpenSSL
     readme = File.join(package.target, 'README')
     configure = File.join(package.target, 'Configure')
-    makefile = File.join(package.target, 'Makefile')
+    openssl_conf_h = File.join(package.target, 'include', 'openssl', 'opensslconf.h')
     minfo = File.join(package.target, 'MINFO')
     makefile_mingw = File.join(package.target, 'ms', 'mingw32a.mak')
     makefile_msys = File.join(package.target, 'ms', 'mingw32a-msys.mak')
-    x509 = File.join(package.target, 'include', 'openssl', 'x509.h')
-    x509_vfy = File.join(package.target, 'include', 'openssl', 'x509_vfy.h')
-    tmp_x509 = File.join(package.target, 'outinc', 'openssl', 'x509.h')
-    tmp_x509_vfy = File.join(package.target, 'outinc', 'openssl', 'x509_vfy.h')
+    libcrypto = File.join(package.target, 'out', 'libcrypto.a')
+    libssl = File.join(package.target, 'out', 'libssl.a')
+    installed_libcrypto = File.join(mingw.target, 'lib', 'libcrypto.a')
+    installed_libssl = File.join(mingw.target, 'lib', 'libssl.a')
 
     # Put files for the :download task
     package.files.each do |f|
@@ -47,16 +48,7 @@ namespace(:dependencies) do
     end
     task :extract => [readme]
 
-    # fix a missing header copy
-    file tmp_x509 => x509 do |f|
-      cp x509, tmp_x509
-    end
-
-    file tmp_x509_vfy => x509_vfy do |f|
-      cp x509_vfy, tmp_x509_vfy
-    end
-
-    task :prepare => [:extract, tmp_x509, tmp_x509_vfy] do
+    task :prepare => [:extract] do
       package_root = File.join(RubyInstaller::ROOT, package.target)
       include_dir = File.join(package_root, 'include', 'openssl')
       test_dir = File.join(package_root, 'test')
@@ -88,15 +80,16 @@ namespace(:dependencies) do
       end
     end
 
-    file minfo => [:prepare] do
+    file openssl_conf_h => [:prepare]
+    file minfo => [openssl_conf_h] do
       cd package.target do
-        msys_sh "make files"
+        msys_sh "perl util/mkfiles.pl > MINFO"
       end
     end
 
     file makefile_mingw => [minfo] do
       cd package.target do
-        msys_sh "perl util/mk1mf.pl no-asm dll shared Mingw32 > ms/mingw32a.mak"
+        msys_sh "perl util/mk1mf.pl shlib Mingw32 > ms/mingw32a.mak"
       end
     end
 
@@ -108,27 +101,49 @@ namespace(:dependencies) do
       contents.gsub!(")\\", ")/")
       contents.gsub!("crypto\\", "crypto/")
       contents.gsub!("\\asm", "/asm")
+      contents.gsub!("\\usr\\local", "/mingw")
       contents.gsub!(/if exist (\S+)(.*)/, "if [ -f \"\\1\" ]; then (\\2); fi")
       File.open(makefile_msys, 'w') do |f|
         f.write contents
       end
     end
 
-    task :compile => [makefile_msys] do
+    file libssl => [libcrypto]
+    file libcrypto => [makefile_msys] do
       cd package.target do
         msys_sh "make -f ms/mingw32a-msys.mak"
       end
     end
+    task :compile => [libcrypto]
 
     task :check => [:compile] do
-      cd package.target do
-        Dir.glob('out/*.exe').each do |test_app|
-          sh test_app
+      test_dir = File.join(package.target, 'out')
+      cd test_dir do
+        Dir.glob('*.exe').each do |test_app|
+          if test_app =~ /evp/
+            sh "#{test_app} ../test/evptests.txt"
+          elsif test_app =~ /openssl/
+            sh "#{test_app} version"
+          else
+            sh test_app
+          end
         end
       end
     end
+
+    file installed_libssl => [installed_libcrypto]
+    file installed_libcrypto => [libcrypto] do
+      include_dir = File.join(package.target, 'outinc', 'openssl')
+      target_include_dir = File.join(mingw.target, 'include')
+
+      cp libcrypto, installed_libcrypto
+      cp libssl, installed_libssl
+      cp_r include_dir, target_include_dir
+    end
+    task :install => [installed_libcrypto]
+
+    task :all => [:download, :extract, :prepare, :compile, :install]
   end
 end
 
-task :download  => ['dependencies:openssl:download']
-task :extract   => ['dependencies:openssl:extract']
+task :openssl => ['dependencies:openssl:all']
