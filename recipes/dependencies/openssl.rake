@@ -13,6 +13,7 @@ namespace(:dependencies) do
     configure = File.join(package.target, 'Configure')
     openssl_conf_h = File.join(package.target, 'include', 'openssl', 'opensslconf.h')
     minfo = File.join(package.target, 'MINFO')
+    makefile = File.join(package.target, 'Makefile')
     makefile_mingw = File.join(package.target, 'ms', 'mingw32a.mak')
     makefile_msys = File.join(package.target, 'ms', 'mingw32a-msys.mak')
     libcrypto = File.join(package.target, 'out', 'libcrypto.a')
@@ -43,12 +44,27 @@ namespace(:dependencies) do
 
       # remove bundled Makefile
       cd package.target do
-        # rm_f 'Makefile'
+        rm_f 'Makefile'
       end
     end
     task :extract => [readme]
 
-    task :prepare => [:extract] do
+    file configure => [:extract] do
+      contents = File.read(configure)
+      contents.gsub!(":-mno-cygwin -Wl,--export-all -shared:.dll.a", ":-mno-cygwin -Wl,--export-all -shared:.dll.a")
+      File.open(configure, 'w') do |f|
+        f.write contents
+      end
+    end
+
+    file makefile => [configure] do
+      cd package.target do
+        msys_sh "perl Configure mingw shared no-asm"
+      end
+    end
+    task :configure => [makefile]
+
+    task :prepare => [:configure] do
       package_root = File.join(RubyInstaller::ROOT, package.target)
       include_dir = File.join(package_root, 'include', 'openssl')
       test_dir = File.join(package_root, 'test')
@@ -89,7 +105,7 @@ namespace(:dependencies) do
 
     file makefile_mingw => [minfo] do
       cd package.target do
-        msys_sh "perl util/mk1mf.pl shlib Mingw32 > ms/mingw32a.mak"
+        msys_sh "perl util/mk1mf.pl shlib no-asm Mingw32 > ms/mingw32a.mak"
       end
     end
 
@@ -142,7 +158,7 @@ namespace(:dependencies) do
     end
     task :install => [installed_libcrypto]
 
-    task :all => [:download, :extract, :prepare, :compile, :install]
+    task :all => [:download, :extract, :configure, :prepare, :compile, :install]
   end
 end
 
