@@ -55,7 +55,7 @@ namespace(:tools) do
       ENV['PATH'] = "#{new_ruby};#{ENV['PATH']}"
       ENV.delete("RUBYOPT")
       cd package.target do
-        sh "ruby setup.rb install #{package.configure_options.join(' ')} --destdir=#{File.join(RubyInstaller::ROOT, package.install_target)}"
+        sh "ruby setup.rb install #{package.configure_options.join(' ')}"
       end
 
       # now fixes all the stub batch files form bin
